@@ -9,8 +9,8 @@ on: status
 jobs:
   deploy:
     if: >-
-      github.event.state == 'success' &&
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' &&
+      github.event.state == 'success'
     runs-on: ubuntu-latest
     environment:
       name: production
