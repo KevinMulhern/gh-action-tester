@@ -1,49 +1,79 @@
----
 version: 2.1
 
 executors:
-  rails-executor:
+  rails:
     docker:
-      - image: cimg/ruby:3.0.2-browsers
+      - image: cimg/ruby:3.1.2-browsers
         environment:
           RAILS_ENV: test
-          POSTGRES_USERNAME: postgres
-          POSTGRES_PASSWORD: password
+          RACK_ENV: test
+          RAILS_TEST_PORT: 5002
+          PAGER: cat # stops psql db:schema:load hanging
+      - image: circleci/redis:alpine
       - image: circleci/postgres:12.2-ram
         environment:
+          POSTGRES_DB: circle_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: test
-    working_directory: ~/gh-actions-tester
+    working_directory: /home/circleci/web-app
 
 commands:
-  build-app:
-    description: Building app
+  bundle-install:
+    steps:
+      - run:
+          name: Set bundle path
+          command: bundle config --local path vendor/bundle
+      - run:
+          name: Bundle install
+          command: bundle install --jobs=4 --retry=3
+
+  database-setup:
+    description: Prepare database
+    steps:
+      - run:
+          name: Waiting for database
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: Installing postgresql-client
+          command: sudo apt update && sudo apt install postgresql-client-12
+      - run:
+          name: Load schema
+          command: bin/rails db:schema:load
+
+  build-web-app:
+    description: Building web-app
     steps:
       - checkout
-
-      - run: gem install bundler:2.2.33
-      - run: bundle install --path vendor/bundle
-      - run: dockerize -wait tcp://localhost:5432 -timeout 1m
-      - run: bundle exec rake db:schema:load
+      - run:
+          name: Create date_dependency_checksum
+          command: date '+%Y %U' > date_dependency_checksum
+      - run:
+          name: Copy configs into place
+          command: |
+            cp config/{database_circleci,database}.yml
+      - bundle-install
+      - database-setup
 
 jobs:
-  tests:
-    executor: rails-executor
+  rspec:
+    executor: rails
     steps:
-      - build-app
-      - run: bundle exec rspec
-  seeds:
-    executor: rails-executor
-    steps:
-      - build-app
+      - build-web-app
       - run:
-          name: Seeds
-          command: bin/rails db:seed
+          name: RSpec
+          command: bundle exec rspec
+
+  seeds-development:
+    executor: rails
+    steps:
+      - build-web-app
+      - run:
+          name: Development seeds
+          command: FIXTURE_PATH=db/fixtures/development bin/rails db:seed
 
 workflows:
   version: 2
-  build:
+  build_and_test:
     jobs:
-      - tests
-      - seeds
+      - rspec
+      - seeds-development
