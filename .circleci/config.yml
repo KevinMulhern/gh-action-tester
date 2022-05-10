@@ -1,0 +1,50 @@
+---
+version: 2.1
+
+executors:
+  rails-executor:
+    docker:
+      - image: cimg/ruby:3.0.2-browsers
+        environment:
+          RAILS_ENV: test
+          POSTGRES_USERNAME: postgres
+          POSTGRES_PASSWORD: password
+      - image: cimg/postgres:14.2
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: test
+    working_directory: ~/gh-actions-tester
+
+commands:
+  build-app:
+    description: Building app
+    steps:
+      - checkout
+
+      - run: gem install bundler:2.2.33
+      - run: bundle install --path vendor/bundle
+      - run: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run: bundle exec rake db:schema:load
+
+jobs:
+  tests:
+    executor: rails-executor
+    steps:
+      - build-app
+      - run: bundle exec rspec
+  seeds:
+    executor: rails-executor
+    steps:
+      - build-app
+      - run:
+          name: Seeds
+          command: bin/rails db:seed
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - tests
+      - linters
+      - seeds
