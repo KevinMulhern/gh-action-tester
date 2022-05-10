@@ -4,13 +4,13 @@ concurrency:
   group: production
   cancel-in-progress: true
 
-on:
-  push:
-    branches:
-      - main
+on: status
 
 jobs:
   deploy:
+    if: >-
+      github.event.state == 'success' &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: production
