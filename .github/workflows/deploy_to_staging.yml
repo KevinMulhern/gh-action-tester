@@ -1,0 +1,27 @@
+name: Deploy
+
+concurrency:
+  group: staging
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  staging_deploy:
+    if: ${{ github.event.label.name == 'deploy-to-staging' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://secret-woodland-05563.herokuapp.com/
+    name: Deploy staging app
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Push to Heroku
+        run: git push --force https://heroku:$HEROKU_API_KEY@git.heroku.com/$HEROKU_APP_NAME.git main
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: secret-woodland-05563
