@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy With Label
 
 concurrency:
   group: staging
@@ -17,11 +17,17 @@ jobs:
       url: https://secret-woodland-05563.herokuapp.com/
     name: Deploy staging app
     steps:
-      - uses: actions/checkout@v2
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v5.2
+      - name: Checkout branch
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Add branch to heroku
+        run: git push https://heroku:$HEROKU_API_KEY@git.heroku.com/$HEROKU_APP_NAME.git ${{steps.branch-name.outputs.current_branch}}
       - name: Push to Heroku
-        run: git push --force https://heroku:$HEROKU_API_KEY@git.heroku.com/$HEROKU_APP_NAME.git main
+        run: git push https://heroku:$HEROKU_API_KEY@git.heroku.com/$HEROKU_APP_NAME.git ${{steps.branch-name.outputs.current_branch}}:main -f
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
           HEROKU_APP_NAME: secret-woodland-05563
